@@ -1,1 +1,9 @@
 * 论文笔记
+
+  本项目受项目 [[https://github.com/dennybritz/deeplearning-papernotes][deeplearning-papernotes]] 启发。
+
+  更正式的论文阅读总结见 [[https://linusp.github.io/notes.html#orgheadline4][此处]]。
+
+** 2016-06
+
+   + [[file:natural_language_comprehension_with_the_epireader.org][Natural Language Comprehension with the EpiReader]][[[https://arxiv.org/abs/1606.00227][arXiv]]]
