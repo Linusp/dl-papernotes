@@ -1,4 +1,155 @@
-#+INTERLEAVE_PDF: ~/Dropbox/reference/nlp/1606.02270v1.pdf
+#+STARTUP: showall
+#+INTERLEAVE_PDF: ../papers/1606.02270v1.pdf
 * Natural Language Comprehension with the EpiReader
 
-TODO
+** 简介
+
+   作者信息: Adam Trischler, Zheng Ye, Xingdi Yuan, Kaheer Suleman。
+
+   本篇论文来自一家致力于 "teach machine to understande human literacy" 的人工智能公司 [[http://www.maluuba.com/][Maluuba]] ，他们在论文中提出了一个名为 *EpiReader* 的神经网络模型，用来处理类似我们英语考试中完型填空的问题，并且在 Google Deepmind 和 Facebook 的数据集上分别达到了 74% 和 64.7% 的正确率，这是目前最好的成绩。
+
+** Notes for page 1
+   :PROPERTIES:
+   :interleave_page_note: 1
+   :END:
+
+*** 第一节: Introduction
+
+    希腊哲学家 Epicurus(伊比鸠鲁) 的 "多解释原则(Principle of Multiple Explanations)": 如果有多个理论与观察到的数据一致，那么将这些理论都保留，直到有更多的数据被观察到。
+
+    #+BEGIN_QUOTE
+    The philosopher Epicurus first formalized this idea in his Principle of Multiple Explanations: if several theories are consistent with the observed data, retain them all until more data is observed.
+    #+END_QUOTE
+
+    将模型命名为 EpiReader 大概是在致敬 Epicurus，文中也说 "we argue that the same principle can be applied to machine comprehension of natural language"。
+
+    然后提了一下机器理解(Machine Comprehension)的重要性，并表示将采取和人学在校学习类似的方式来进行评估，使用的问题会涵盖对多种能力的评估，包括简单的因果推断和复杂的推理。
+
+    数据集的话使用了两个比较大的数据集，分别是:
+    + 美国有线电视网络(Cable News Network, CNN)和英国每日邮报(Daily Mail)语料
+    + 来自[[https://www.wikiwand.com/zh/%25E5%258F%25A4%25E8%2585%25BE%25E5%25A0%25A1%25E8%25AE%25A1%25E5%2588%2592][古腾堡计划]](Project Gutenberg)书籍中的儿童读物测试(Children's Book Test, CBT)数据
+
+    这两个数据集都使用了完型填空风格的问题(Cloze-style questions)，给定一些句子，其中的一些词被删去，要求根据对应的文章来补全这些句子。
+
+** Notes for page 2
+   :PROPERTIES:
+   :interleave_page_note: 2
+   :END:
+
+*** (续)第一节: Introduction
+
+    EpiReader 模型分为两部分: 第一部分通过浅层的文本比对从问题关联的文本中提取出若干个可能的候选答案，第二部分通过更深层的语义比较对这些候选答案进行排序。前者被称为 /Extractor/ ，后者被称为 /Reasoner/ 。
+
+    Reasoner 基于 Dagan 在 2006 年提出的 Recognizing Textual Entailment(RTE)技术， RTE 也被称为自然语言推理(Natural Language Inference, NLI)。
+
+    Extractor 作为 filter 从大量可能的答案中筛选出更有可能的小部分， Reasoner 则进行精确地匹配得到正确的结果。
+
+    Extractor 使用了 Pointer Network 的形式(Vinyals, 2015)，使用了可微的 attention 机制，用来从文本中定位潜在的可能答案。 Reasoner 将候选的答案填到问题中得到若干个句子，然后和文本中每一个句子进行对比。
+
+*** 第二节: Problem definition, notation, datasets
+
+    数据表示成 \((Q, T, \alpha^{​*}, A)\) ，其中 Q 是问题， T 是关联的的大段文本，A 是可能的答案集合，\(\alpha^{*}\) 是正确答案。
+
+    数据集的话，如下
+    + CNN: 从 CNN 网站上爬的文章，文章本身作为 ”关联文本“，问题则从文章附带的简单摘要中生成。这些摘要都是人工生成的，在用来生成问题时，从中选中一个命名实体然后将其替换成一个占位符。所有的命名实体都预先替换成 "anoymized tokens" ，使得模型不需要去学习命名实体本身(没太理解)。
+    + CBT: 生成方法与 CNN 类似，但是 ”关联文本“ 是书籍中节选的 20 个句子(连续的?)，而且由于没有摘要，就取下一个句子作为问题，按被替换的词的类别(命名实体，名词，动词，介词)对数据进行了分类，不过本篇论文只关注前两类。此外命名实体没有被替换。
+
+** Notes for page 3
+    :PROPERTIES:
+    :interleave_page_note: 3
+    :END:
+
+*** (续)第二节: Problem definition, notation, datasets
+
+    两个数据集在构成上的不同，也就意味着它们考察的能力也不同了。相对来说， CBT 似乎要更复杂一些？
+
+*** 第三节: The EpiReader
+
+    这一节就正式讲模型咯。
+
+    *假设*: 一个问题的答案通常是关联文本中的一个词或者短语
+
+    [[file:../images/epireader_extractor.png]]
+
+    Extractor 使用的是 Pointer Network，用两个双向 RNN 来对关联文本和问题进行编码。
+
+    对关联文本，使用由 GRU 构成的双向 RNN ，来得到每一个词的编码向量；对问题，也使用由 GRU 构成的双向 RNN ，但只取 final forward state 和 initial backward state 时输出的两个向量，然后拼接起来。对关联文本中的每个词，直接和问题的编码向量内积然后求 exp 作为相应的候选概率。
+
+    当然了，在一个文本中，同一个词是可能多次出现的，这种情况下直接累加。
+
+** Notes for page 4
+    :PROPERTIES:
+    :interleave_page_note: 4
+    :END:
+
+*** (续)第三节: The EpiReader
+
+    在输入 Reasoner 前，首先将 Extractor 得到的词填到 question 中去，并且将文本按句子切分开。
+
+    将它们中的词都用词向量表示，于是每个文本中的句子可以表示为一个矩阵，每个候选的补全 question 也可以表示为一个矩阵。
+
+** Notes for page 5
+    :PROPERTIES:
+    :interleave_page_note: 5
+    :END:
+
+*** (续)第三节: The EpiReader
+
+    [[file:../images/epireader_reasoner.png]]
+
+    每次输入都有两个矩阵输入，一个是填了候选答案的 question 中词向量的矩阵 H，一个是文本中句子中词向量的矩阵
+
+    首先对文本中句子的矩阵进行扩充，增加一个两行的 M 得到 S
+
+    M: 第一行为候选词向量与句子矩阵的乘积，第二行是句子中每个词向量与 question 中词向量之间的最大内积。
+
+    然后对 S 和 H 都进行卷积，两者的卷积核大小一样。
+
+    卷积后加上 bias 项然后应用一个非线性变换(ReLU)，然后使用 Maxpooling 得到 S 和 H 对应的向量(不是矩阵了)，并且这两个向量的长度是一样的。然后通过向量的双线性形式表示来量化这两个向量之间的相似得分:
+
+    [[file:../images/bilinear_form_score.png]]
+
+    其中的 R 是一个方阵，是可训练的参数。
+
+    得到相似得分后和两个向量一起拼接成一个新的向量。这样 N 个句子可以得到 N 个向量，将这 N 个向量作为一个序列再输入到另外一个由 GRU 组成的 RNN 中去，得到最后一个 time step 的输出 \(y_{k}\) 来表示第 k 个候选答案的得分。
+
+    得到所有 K 个候选结果的分数后进行一下 softmax 得到最终的概率 \(e_{k}\)
+
+    #+BEGIN_QUOTE
+    The reranking step performed by the Reasoner helps mitigate a significant weakness of most existing attention mechanisms. Specifically, these mechanisms blend representations of all possible outcomes together using "soft" attention, rather than considering them discretely using "hard" attention. This is like exploring a maze by generating an average path out of the several before you, and the attempting to follow it by walking throught a wall. Examining possibilities individually, as in the Reasoner module, is more natural.
+    #+END_QUOTE
+
+    大意是说这第二部分模型(Reasoner)弥补了 Attention 机制的弱点 —— 第一部分模型(Extractor)其实已经给出候选结果和对应的置信度了，直接按照置信度取结果，讲道理也是可以的。
+
+    得到 \(e_{k}\) 后和之前的 Extractor 的概率 \(p_{k}\) 相乘得到最终的概率。
+
+    目标函数由两部分组成: \(Loss_{E}\) 和 \(Loss_{R}\)。前者是 Extractor 的 negative loglikelihood
+
+    $$Loss_{E}=E[-\log P(\alpha^{*}|T, Q)]$$
+
+** Notes for page 6
+    :PROPERTIES:
+    :interleave_page_note: 6
+    :END:
+
+*** (续)第三节: The EipReader
+
+    而 \(Loss_{R}\) 是这样的
+
+    $$Loss_{R} = \mathop{\mathbb{E}}\limits_{(Q, T, \alpha^{​*}, A)}\left[\mathop{\sum}\limits_{\hat{\alpha_{i}}}[\gamma - \pi^{*}+\pi_{\hat{\alpha}_{i}}]_{+}\right]$$
+
+    [[file:../images/reasoner_loss.png]]
+
+    其中 \(\gamma\) 是一个 "margin hyperparameter"， \(\hat{\alpha_{i}}\) 是由 Extractor 筛选出来的候选答案，\(\pi^{*}\)是正确答案的最终置信度。而 \([x]_{+}\) 表示正负判断，也就是一个符号函数咯。所以这个式子呢，是要求正确答案的概率比其他答案的概率至少高出 \(\gama\) 。
+
+    两个目标函数再组合起来
+
+    $$Loss = Loss_{E} + \lambda Loss_{R}$$
+
+    作者发现这里的 \(\lambda\) 要比较大，在 10 到 100 之间比较合适。因为 Extractor 容易过拟合，导致最后的概率受 Extractor 的输出概率影响很大，需要较大的 \(\lambda\) 才能避免这种情况。
+
+*** 第四节: Related Work
+
+    + 2015, Hermann, Attentive Reader models
+    + 2015, Hill, Memory Networks
+    + 2016, Chen, using a bilinear term instead of a tanh layer to compute the attention between question and passage words
