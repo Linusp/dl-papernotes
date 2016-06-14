@@ -5,6 +5,8 @@
 
   更正式的论文阅读总结见 [[https://linusp.github.io/notes.html#orgheadline4][此处]]。
 
+  注: Emacs 用户可以安装 org-mode 和 [[https://github.com/rudolfochrist/interleave][interleave]]，打开对应论文的笔记后执行 /M-x interleave/ 来在 Emacs 里查看论文和笔记。
+
 ** 2016-06
 
    + [[file:notes/natural_language_comprehension_with_the_epireader.org][Natural Language Comprehension with the EpiReader]][[[https://arxiv.org/abs/1606.02270][arXiv]]]
