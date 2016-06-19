@@ -1,0 +1,238 @@
+#+STARTUP: showall
+#+INTERLEAVE_PDF: ../papers/find_structure_in_time.pdf
+
+* Find Structure in Time
+
+** 简介
+
+   这是 Elman 在 1990 年发表的讲述简单 RNN 模型应用的一篇论文，是早期的 RNN 研究工作，若想了解 RNN 发展历程，不妨一读。
+
+** Notes for page 1
+   :PROPERTIES:
+   :interleave_page_note: 1
+   :END:
+
+   绪论部分，从认知角度谈 “时间” 在人类行为中的重要性，以及以某种形式刻画或表示 “时间结构” 的必要性。
+
+** Notes for page 2
+   :PROPERTIES:
+   :interleave_page_note: 2
+   :END:
+
+   仍然是绪论部分，继续探讨时间结构的表示方式。
+
+   所谓 “时间结构” ，并不是指物理学意义上的时间，而是指所有由时序事件组成的事物中的有意义的结构，比如语言中有语法结构、股票价格曲线中反映的社会经济情况等等。对于这些事物，最简单的表示方法，当然就是用其中的时序事件按先后顺序表示，但这样的话，其中的 “结构” 并不明显，仍然需要进行进一步的解读。
+
+   对于如何表示 “时间结构”，作者的观点是:
+   #+BEGIN_QUOTE
+   A better approach would be to represent time implicitly rather than explicitly. That is, we represent time by the effect it has on processing and not as an additional of the input.
+   #+END_QUOTE
+
+   作者着重在 NLP 相关的任务上探讨这个问题，并发现联结主义(connectionist)即神经网络模型可以很好地达到自己的目的。
+
+** Notes for page 3
+   :PROPERTIES:
+   :interleave_page_note: 3
+   :END:
+
+   时间结构的表示，如前所述，最简单的办法是用一个向量来表示蕴含时间结构的输入，时序上靠前的元素放在向量的靠前部分，然后将这样的向量整个输入到模型中去。
+
+   这样的表示方法当然是有问题的，以股票价格曲线为例，这个向量的长度可能是非常长的，相应的模型的设计会有很多的麻烦。
+
+   另一种办法，是对输入的时序序列进行缓存，每次只输入一部分到模型中去，比较简单的一个办法是用一个固定大小的窗口在时序序列上向后滑动来将完整的输入变换成一系列固定长度的输入向量 —— 不得不赞叹一下，后面的 NNLM 就是使用的这种方法！
+
+   但这种表示方法是有一定的缺陷的，主要是两点:
+   1. 现实环境中，变长序列才是常见的情形
+   2. 无法准确地衡量两个向量之间的相似程度
+
+** Notes for page 4
+   :PROPERTIES:
+   :interleave_page_note: 4
+   :END:
+
+   #+BEGIN_QUOTE
+   There is another, very different possibility: Allow time to be represented by the effect it has on processing. This means giving the processing system dynamic properties that are responsive to temporal sequences. In short, the network must be given memory.
+   #+END_QUOTE
+
+   总结一下
+   1. 我要用神经网络模型
+   2. 这个神经网络模型必须有 “记忆能力”
+
+   相关的研究当然早就有人做过了，如下:
+   + 1986 年，Jordan 提出了简单的 RNN 模型，现在称之为 Jordan Network
+   + 1988 年，Pineda
+   + 1987 年，Stornetta, Hogg, Huberman
+   + 1987 年，Tank 和 Hopfield, 提出了现在称之为 Hopfield Network 的模型，这种模型和 RNN 的思路差异很大
+   + 1987 年，Watrous 和 Shastri
+   + 1988 年，Williams 和 Zipser
+
+   Jordan 提出的模型是一个包含一个回环结构的神经网络模型，从输出层连接到隐藏层。Elman 对其作出一个修改: 回环结构从隐藏层反向连接到隐藏层自身，对前一时刻隐藏层单元的输出进行缓存，称之为 Context Units。
+
+   Context Units 的初始值设置为 0.5，到隐藏层单元的连接权值也固定为 1.0。
+
+   然后这个模型是这样工作的：对一个时序序列，每个 time step 的元素连续地、逐个地输入到模型中去，Context Units 的内容在这个时序序列输入完成前一直进行更新。
+
+** Notes for page 5
+   :PROPERTIES:
+   :interleave_page_note: 5
+   :END:
+
+   Context Units 相当于一个延时单元，记录了上一时刻隐藏层单元的输出，于是就赋予了模型记忆能力。
+
+   同时，Context Units 本身的内容也就成为了 “记忆” 的一种表达，按论文上的说法，是 "Internal Representation of Time"。
+
+   以我们对神经网络模型的理解，可以认为隐藏层的输出是输入的特征表达，以一个长度为 5 的时序序列为例，第一个元素输入后， Context Units 的内容被更新为隐藏层的输出也就是第一个元素的特征表达；在第二个元素输入时，Context Units 中的内容也就是第一个元素的特征表达和第二个元素共同输入到隐藏层，得到新的特征表达并更新到 Context Units 中，此时 Context Units 中的内容是第一个元素和第二个元素共同的特征表达。依次类推，当序列输入完毕时，Context Units 中的内容其实就是对整个序列的一个特征表达。
+
+** Notes for page 7
+   :PROPERTIES:
+   :interleave_page_note: 7
+   :END:
+
+   从这里开始都是 Elman 进行的一些实验了。
+
+   第一个实验是 XOR 的预测问题。XOR 并不是一个序列预测问题，但 Elman 对其进行了变换使之成为序列预测问题。
+
+   训练数据中输入序列的生成: 从四种可能的异或表达式中随机选择一个，并将其结果附加在后面，如 '1' 和 '0' 的异或结果是 '1'，就得到 '101' 这样长度为 3 的序列，反复这个过程并将结果拼接起来，得到一个长度为 3000 的序列。
+
+   将输入序列向左移动一位作为输出序列，即用模型去预测 “输入序列中下一时刻的元素”。
+
+   比如:
+   #+BEGIN_EXAMPLE
+   input:  1 0 1 0 0 0 0 1 1 1 1 0 1 0 1 ...
+   output: 0 1 0 0 0 0 1 1 1 1 0 1 0 1 ? ...
+   #+END_EXAMPLE
+
+   对于这样的序列，实际上只有部分预测结果是有可能的，即第 3n-1 个输入时，预测第 3n 个输入是有可能的，因为第 3n 个输入是第 3n-1 个输入和第 3n-2 个输入进行异或运算得到的结果。
+
+   这种隐含的结构，能被学习到么？
+
+** Notes for page 8
+   :PROPERTIES:
+   :interleave_page_note: 8
+   :END:
+
+   训练完毕后，再次随机生成输入序列输入到模型中，发现在第 3n-1 个 time step，模型的错误率最低，约 0.15，而在第 3n-2 和第 3n 个 timestep，错误率高达 0.35 左右。
+
+   这说明模型是学习到了输入序列中的 “时间结构” 的，即模型能知道第3n 个输入和 3n-1 个输入和第 3n-2 个输入存在一定的关系，这种能力通过测试时的错误率曲线反映了出来。
+
+** Notes for page 9
+   :PROPERTIES:
+   :interleave_page_note: 9
+   :END:
+
+   第二个实验在 XOR 实验的基础上再进一步。
+
+   定义这样的字符串变换规则:
+   #+BEGIN_EXAMPLE
+   b -> ba
+   d -> dii
+   g -> guuu
+   #+END_EXAMPLE
+
+   首先随机生成由 b, d, g 构成的长度为 1000 的序列，然后按照上述规则对序列进行变换，最后得到的序列作为输入序列。同 XOR ，训练模型来预测输入序列中下一时刻的字符。
+
+** Notes for page 10
+   :PROPERTIES:
+   :interleave_page_note: 10
+   :END:
+
+   测试结果也表明模型学习到了辅音字母(b, d, g)后面跟随元音字母(a, ii, uuu)这一模式，并且能知道不同的辅音字母后面的元音字母的类别和数量，但无法预测 a、ii、uuu 后的下一个输入。
+
+   值得注意的是，模型虽然无法准确预测 a、ii、uuu 后的下一个输入的具体类别，却总能知道这下一个输入是一个辅音字母(b, d, g)。
+
+** Notes for page 13
+   :PROPERTIES:
+   :interleave_page_note: 13
+   :END:
+
+   #+BEGIN_QUOTE
+   the most fundamental concepts of linguistic analysis have a fluidity, which at the very least, suggests an important role for learning; and the exact form of the those concepts remains an and important question
+   #+END_QUOTE
+
+** Notes for page 14
+   :PROPERTIES:
+   :interleave_page_note: 14
+   :END:
+
+   第三个实验，尝试模型去学习“词”的概念。
+
+   首先随机 200 个生成包含 4-9 个词的句子，每个词从 15 个候选的词之中随机选择。将这 200 个句子拼接起来，得到一个包含 1270 个词的序列。然后，词和词之间不用任何东西分隔，句子之间同样如此，于是就得到一个包含 4963 个字母的字符序列。
+
+   此外，每个词都表示成长度为 5 的向量。
+
+   训练时将这个序列中的字母按顺序逐个输入模型，同之前的实验一样，预测下一时刻的输入。
+
+   这个实验，相比上一个实验，复杂度又有所提高，但 Elman 提出的模型仍然没有令人失望，它学习到了字母和字母之间的共现模式，换言之，它能从新的随机生成的字符序列中，找到词和词之间的界限。但与此同时，在一些有歧义的情况下模型也会犯错，比如 'the' 和 'they' 两个都是合法的词。
+
+** Notes for page 15
+   :PROPERTIES:
+   :interleave_page_note: 15
+   :END:
+
+   #+BEGIN_QUOTE
+   This simulation focuses only on a limited part of the information available to the language learner. The simulation makes the simple point that there is information in the signal that could serve as a cue to the boundaries to linguistic units which must be learned, and it demonstrates the ability of simple recurrent networks to extract this information
+   #+END_QUOTE
+
+** Notes for page 17
+   :PROPERTIES:
+   :interleave_page_note: 17
+   :END:
+
+   #+BEGIN_QUOTE
+   While it is undoubtedly true that the surface order of words dose not provide the most insightful basis for generalizations about word order, it is also true that from the point of view of the listener, the surface order is the only visible(or audible) part.
+   #+END_QUOTE
+
+   上个实验从字符级别学习到了词的表示，第四个实验要从句子中学习简单的语法结构。
+
+   共有 29 个词可以选，分为动词和名词两大类，每类下面还有一些小的分类，名词被分为 HUM, ANIM, INANIM, AGRESS, FRAG, FOOD 六类，动词被分为 INTRAN, TRAN, AGPAT, PERCEPT, DESTROY, EAT 六类。
+
+   同时有 15 个句子模板可选，句子模板也分为两大类，一类为 "名词-动词-名词" 的主谓宾结构，一类为 "名词-动词" 的主谓结构。
+
+   如此从 15 个句子模板中随机挑选模板，然后根据模板挑选单词，生成 10000 个句子，由 27534 个单词组成的序列。
+
+   此外，每个单词用长度为 31 的向量表示。
+
+** Notes for page 19
+   :PROPERTIES:
+   :interleave_page_note: 19
+   :END:
+
+   同之前的实验一样，每个用长度为 31 的向量表示的单词逐个输入模型，预测下一时刻的输入。
+
+   同之前的实验一样，测试时的误差在某些特定时刻很小，而在其他时刻很高。
+
+   #+BEGIN_QUOTE
+   although the prediction cannot be error-free, it is also true that word order is not random. For any given sequence of words there are a limited number of possible successors.
+   #+END_QUOTE
+
+   以及
+   #+BEGIN_QUOTE
+   the network should learn the expected frequencey of occurrence of each of the possible succesor words; it should then activate the output nodes proportionlal to these expected frequencies.
+   #+END_QUOTE
+
+** Notes for page 21
+   :PROPERTIES:
+   :interleave_page_note: 21
+   :END:
+
+   Elman 在训练完模型后，保持模型参数不变，然后分别将 29 个单词输入到模型中，从 Context Units 中得到一个 150-bit 的向量，以此作为各个词的 "internal representations"。
+
+   然后对这 29 个词的 "internal representations" 进行层次聚类，得到的结果非常令人惊喜。
+
+   首先，名词、动词被分别聚成一类了，这表明模型学习到了词的类别。
+
+** Notes for page 22
+   :PROPERTIES:
+   :interleave_page_note: 22
+   :END:
+
+   然后，从层次聚类的结果来看，子类别也被正确聚类了，比如名词中， ANIMALS、HUMAN 这些子类都被正确地聚集了。
+
+   看，现在被广泛使用的 word embedding 思想，其实在 20 几年前，就已经产生了！
+
+** Notes for page 25
+   :PROPERTIES:
+   :interleave_page_note: 25
+   :END:
+
+   还有第五个实验……写不动了……

@@ -14,3 +14,7 @@
 ** 2016-01
 
    + [[file:notes/learning_to_compose_nn.org][Learning to Compose Neural Networks for Question Answering]][[[https://arxiv.org/abs/1601.01705][arXiv]]]
+
+** 1990
+
+   + [[file:notes/find_structure_in_time.org][Find Structure in Time]][[[https://scholar.google.com/citations?view_op=view_citation&hl=en&user=Cxi26JcAAAAJ&citation_for_view=Cxi26JcAAAAJ:bnK-pcrLprsC][Google Scholar]]]
