@@ -1,0 +1,201 @@
+#+STARTUP: showall
+#+INTERLEAVE_PDF: ../papers/1608.05343v1.pdf
+
+* Decoupled Neural Interfaces using Synthetic Gradients
+
+** Notes for page 1
+   :PROPERTIES:
+   :interleave_page_note: 1
+   :END:
+
+*** 第一节: 简介
+
+    在神经网络模型中的几个问题
+    + Forward Locking: 前一层没有用输入完成计算，后一层无法进行根据输入进行计算
+    + Update Locking: 如果一个网络层依赖的层没有完成前馈计算，该层无法进行更新
+    + Backward Locking: 如果一个网络层依赖的层没有完成反向传播，该层无法进行更新
+
+
+    这就导致神经网络的更新(训练)必须是串行、同步的。这对简单的神经网络模型来说问题不大，但有几种情况，这些问题就会变成大问题了:
+    + 由多个异步模块组成的复杂的系统
+    + 分布式模型，模型的一部分共享给多个下游客户端使用，最慢的客户端将会成为模型更新速度的短板
+
+    #+BEGIN_QUOTE
+    The goal of the work is to remove update locking for neural networks.
+    #+END_QUOTE
+
+** Notes for page 2
+   :PROPERTIES:
+   :interleave_page_note: 2
+   :END:
+
+*** 第一节: 简介(续)
+
+    引进一个概念: neural interface。指两个网络层之间的通讯方式，在普通的神经网络里，这种通讯方式就是两个网络层之间的连接，无论是前馈、反馈都是通过这层连接来进行的。
+    + standard neural interface: a connection between two modules(layers)
+    + decoupled neural interface: when a module(layer) send a message(activations) to another module(layer), there is a associated model which produces a predicted error gradients with respect to the message immediately. The predicted gradient is a function of the message alone
+
+
+    进一步地，还可以做到预测每一层的输入: we also preliminary results that extend this idea to also remove forward locking -- resulting in networks whose modules can also be trained without a synchronous forward pass. 不过预测输入这个是怎么做的呢，使用什么来预测呢？因为是要预测输入，这时候网络层肯定是没有输入的，难道说直接利用这一层的网络参数来预测？
+
+    用在 RNN 上发现比 t-BPTT 算法能建模更长时间范围的序列。同时用在由两个时间尺度不同的 RNN 组成的系统上，能大大加快训练速度(比两个 RNN 中更快的那个 RNN 还要快)。
+
+
+    合成梯度的方法与下面这些方法有共同之处:
+    + gradient ascent 中的 value function
+    + bootstrapping 中的 value function
+    + target propagation
+
+    移除 backward locking 的一些方法，这些方法仍然遗留了 update locking
+    + reinforce: 将所有 activations 视作 actions
+    + kickback
+    + policy gradient coagent network
+
+*** 第二节: decoupled neural interfaces(DNI)
+
+    [[file:../images/dni.png]]
+
+    所谓的 DNI ，如上图所示，从 A 层发送数据到 B 层的时候，B 层会有对应的另外一个模型，根据 A 层当时的输出 \(h_{A}\)、B 层当时的状态(状态是指？)以及自身的其他参数 c，来去得到 A 层的残差的估计值 \(\hat{\delta_{A}}\)。而 B 层在后面可以得到 A 层真正的残差 \(\delta_{A}\)，就可以用来训练 \(M_{B}\) 这个模型了。
+
+    这样 A 和 B 的更新就解耦了。将这个思想推广开来，就可以称之为 DNI 了，预测到的错误信号，如果是残差，就可以用于误差反向传播；还可以用于 target propagation，或者作为 cumulative discounted future reward 用于强化学习。
+
+** Notes for page 3
+    :PROPERTIES:
+    :interleave_page_note: 3
+    :END:
+
+*** 第二节: DNI (续)
+
+    不过作者表示，主要还是关注如何将这个思想应用于可微的神经网络上，用于学习反向传播和基于梯度的网络更新等内容上。并将那个由额外模型产生的残差称之为「合成梯度(synthetic gradients)」
+
+    在神经网络里，对上述理念进行描述，那就是在梯度下降时，有:
+
+    $$\begin{array}{rcl}
+      \theta_{i} &\leftarrow& \theta_{i} - \alpha\delta_{i}\frac{\partial h_{i}}{\partial \theta_{i}} \\
+                 &\leftarrow& \theta_{i} - \alpha\delta_{N}\frac{\partial h_{i}}{\partial \theta_{i}}\cdot \prod_{j=0}^{N-i-1}\frac{\partial h_{N-j}}{\partial h_{N-j-1}}\end{array}$$
+
+    从式子中可以看出，要计算当前的权值更新，需要等待后面所有网络层进行完前馈计算和对应的梯度计算(反向传播).
+
+    而在 DNI 中，不去等待后续步骤以计算精确的 \(\delta_{i}\)，而是利用当前网络层的 \(h_{i}\) 来估计出一个近似的值 \(\hat{\delta_{i}}\)
+
+    $$\begin{array}{rcl}
+      \delta_{i} &\sim& \hat{\delta_{i}} \\
+                 &=& M_{i+1}(h_{i})\end{array}$$
+
+    这里的 \(M_{i+1}\) 不依赖后面层的计算，但需要注意的是，\(M_{i+1}\) 同样需要进行计算和更新，而其更新需要依赖 \(i+1\) 层以后的网络层，这里就相当于把一个网络中的 update locking 转移到另外一个模型中去了，所以这种方法，真的是有意义的么？
+
+    还是稍微有点不同的，梯度合成模型 \(M\) 的训练，并不需要前馈计算完全完成后再根据最后一层的残差再逐层回馈，而是用后一层估计得到的残差来计算这一层的残差，用来作为这一层残差的「预期的值」，这里实际上又做了一次近似，也就是:
+
+    $$\delta_{i} = \hat{\delta}_{i+1}\frac{\partial h_{i+1}}{\partial h_{i}}$$
+
+    得到这个 \(delta_{i}\) 后，通过 \(delta_{i}\) 和 \(\hat{\delta}_{i}\) 之间的误差，再来去调整模型 M，如下图所示:
+
+    [[file:../images/dni_update.png]]
+
+** Notes for page 4
+    :PROPERTIES:
+    :interleave_page_note: 4
+    :END:
+
+*** 第二节: DNI (续)
+
+    如上文所述，为了达到这种逐层前馈并更新的效果，DNI 作了多次近似，能保证模型被稳定、有效地训练么？此处表示第三节有证据表明 DNI 有效稳定(谁知道呢)。
+
+    由于 RNN 在时间维度上展开后，也可以认为它是一个前馈网络，所以 DNI 的思想也能用到 RNN 的训练上，特别是 RNN 存在梯度消失导致长期记忆衰减为短期记忆的问题，DNI 如果用上的话，能让每一个 time step 都得到充分训练。
+
+** Notes for page 5
+    :PROPERTIES:
+    :interleave_page_note: 5
+    :END:
+
+*** 第二节: DNI (续)
+
+    更值得一提的是，由于 DNI 的应用使得 update locking 不再存在，那么在训练 RNN 的时候，就没有必要将 RNN 完全展开了，而是可以每次展开一小部分，这样不仅训练速度可以得到提高，内存使用也可以变得更小了！
+
+    [[file:../images/rnn_dni.png]]
+
+    牛皮:
+    #+BEGIN_QUOTE
+    Although we have explicitly described the application of DNI for communi-cation between layers in feed-forward networks, and between recurrent cores in recurrent networks, thereis nothing to restrict the use of DNI for arbitrary network graphs. The same procedure can be applied toany network or collection of networks, any number of times.
+    #+END_QUOTE
+
+** Notes for page 6
+    :PROPERTIES:
+    :interleave_page_note: 6
+    :END:
+
+*** 第三节: 实验
+
+    以下三个为在前馈网络(包括 CNN)上的实验
+    + 全 DNI 构成的训练
+
+      通过在 MINST 和 CIFAR-10 上的测试，每层都使用 DNI 的方法能够达到和传统方法同等水平的精度(稍微差一点点)。
+
+      [[file:../images/dni_every_layer.png]]
+
+    + 稀疏更新
+
+      对一个四层的前馈网络，以随机的顺序来更新每一层，并且每一层在被选中都是有概率的。在这样的情况下，模型依然是可以被训练的。
+
+      不过明显能看出来，概率值越大，收敛是越快的，最后在迭代次数达到 50w 次时，不同的概率都达到了接近的精度(2% 的误差)，不过一个四层的网络，真的不是过拟合了么……
+
+      [[file:../images/dni_sparse_update.png]]
+
+** Notes for page 7
+    :PROPERTIES:
+    :interleave_page_note: 7
+    :END:
+
+*** 第三节: 实验(续)
+
+    + 完全解锁
+
+      加上一个模型，预测每一层的输入，使得 forward locking 也不见了。预测每一层的输入时，只使用第一层的输入数据，然后根据每一层的实际输入来进行更新。
+
+      [[file:../images/dni_unlock_all.png]]
+
+      加上 synthetic inputs 后，再次进行稀疏更新训练，最终仍然可以将错误率降低到 2% 左右，如下图所示。
+
+      [[file:../images/dni_sparse_update_without_locking.png]]
+
+    然后呢，在 RNN 上进行实验，分别会在这三个任务上进行实验:
+    + Copy
+
+      读入 N 个字符，然后将这 N 个字符原样输出，有点类似 char-level language model 和 autoencoder。
+
+    + Repeat Copy
+
+      读入 N 个字符，以及一个表示重复次数的数字 R，然后重复输出 R 次这 N 个字符构成的序列。
+
+    + char-level language modeling
+
+      (持续地)读取一个字符，并预测下一个字符。
+
+    需要注意的是，这里使用 LSTM 在进行普通的训练(无 DNI)时，使用的也是 t-BPTT 方法。
+
+** Notes for page 8
+    :PROPERTIES:
+    :interleave_page_note: 8
+    :END:
+
+*** 第三节: 实验(续)
+
+    从实验结果上来看，在 Copy 和 Repeat Copy  任务上，使用 DNI 的模型能建模更长的序列。
+
+    [[file:../images/dni_on_rnn.png]]
+
+    上图中 Copy 和 Repeat Copy 两栏中的值表示建模的最大序列长度，越大越好；Penn Treebank 一栏表示语言模型的困惑度(Perplexity，这里用 bits per word 进行度量)，越小越好。
+
+
+** Notes for page 9
+    :PROPERTIES:
+    :interleave_page_note: 9
+    :END:
+
+*** 第三节: 实验(续)
+
+    char-level language 实验用的是 Penn Treebank 数据集，用了包含 1024 个 LSTM 单元的 RNN 。在相同的展开长度 T 的情况下，使用 DNI 进行训练的模型表现出了更快的训练速度和更低的困惑度，如下图所示。
+
+    [[file:../images/dni_on_lm.png]]
+
+    后面还有个实验，不想写了。
