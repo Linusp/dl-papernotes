@@ -9,7 +9,7 @@
 
 ** 2016
 
-   + [[file:notes/natural_language_comprehension_with_the_epireader.org][Natural Language Comprehension with the EpiReader][[[https://arxiv.org/abs/1606.02270][arXiv]]]
+   + [[file:notes/natural_language_comprehension_with_the_epireader.org][Natural Language Comprehension with the EpiReader]][[[https://arxiv.org/abs/1606.02270][arXiv]]]
    + [[file:notes/learning_to_compose_nn.org][Learning to Compose Neural Networks for Question Answering]][[[https://arxiv.org/abs/1601.01705][arXiv]]]
    + Learning Distributed Representations of Sentences from Unlabelled Data[[[http://arxiv.org/abs/1602.03483][arXiv]]]
    + Sentence-Level Grammatical Error Identification as Sequence-to-Sequence Correction[[[http://arxiv.org/abs/1604.04677][arXiv]]]
